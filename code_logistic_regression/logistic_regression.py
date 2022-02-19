@@ -1,9 +1,6 @@
-########## >>>>>> Put your full name and 6-digit EWU ID here. 
+########## Blake Chalpin 00864973
 
 # Implementation of the logistic regression with L2 regularization and supports stachastic gradient descent
-
-
-
 
 import numpy as np
 import math
@@ -12,7 +9,21 @@ sys.path.append("..")
 
 from code_misc.utils import MyUtils
 
-
+def _v_sigmoid(s):
+        '''
+            vectorized sigmoid function
+            
+            s: n x 1 matrix. Each element is real number represents a signal. 
+            return: n x 1 matrix. Each element is the sigmoid function value of the corresponding signal. 
+        '''
+        v_sigmoid = np.vectorize(_sigmoid)
+        return v_sigmoid(s)
+    
+def _sigmoid(s):
+    ''' s: a real number
+        return: the sigmoid function value of the input signal s
+    '''
+    return 1 / (1 + np.exp(-s))
 
 class LogisticRegression:
     def __init__(self):
@@ -40,7 +51,7 @@ class LogisticRegression:
         if not SGD:
             mini_batch_size = X.shape[0]
         
-        self._fit_sgd(X, y, lam, eta, iterations, mini_batch_size)
+        self._fit_sgd(X=X, y=y, lam=lam, eta=eta, iterations=iterations, mini_batch_size=mini_batch_size)
     
     def _fit_sgd(self, X, y, lam = 0, eta = 0.01, iterations = 1000, mini_batch_size = 1):
         ''' Perform Stochastic Gradient Descent training. 
@@ -54,13 +65,55 @@ class LogisticRegression:
                 mini_batch_size: the size of each mini batch size.  
         '''
         X_bias = self._add_bias_column(X)
-        n, d = X_bias.shape
+        _, d = X_bias.shape
         self._init_w_vector(d)
         
-        NUM_MINI_BATCHES = n // mini_batch_size
-        
-        print(f"Num mini-batches ${NUM_MINI_BATCHES}")
+        mini_batch_list = self._generate_mini_batches(X_bias, y, mini_batch_size)
+        NUM_MINI_BATCHES = len(mini_batch_list)
+
+        mini_batch_index = 0 # index to keep track of minibatch we are on
+        while iterations > 0:
+            X_mini, y_mini = mini_batch_list[mini_batch_index]
+            n_mini, _ = X_mini.shape
+
+            # print(f"Batch number index: {mini_batch_index}")
+            # print(f"\tMini batch {mini_batch_index}: X: {mini_batch_list[mini_batch_index][0].shape}, y: {mini_batch_list[mini_batch_index][0].shape}")
+
+            s = y_mini * (X_mini @ self.w)
+            self.w = (eta / n_mini) * ((y_mini * _v_sigmoid(-s)).T @ X_mini).T + (1 - (2 * lam * eta / n_mini)) * self.w
+
+            iterations -= 1
+            mini_batch_index = (mini_batch_index + 1) % NUM_MINI_BATCHES # wrap around to index 0 when at the end
     
+    def _generate_mini_batches(self, X, y, mini_batch_size):
+        ''' Performs mini batching. 
+         
+            Parameters: 
+                X: n x d matrix of samples; every sample has d features, excluding the bias feature. 
+                y: n x 1 vector of lables. Every label is +1 or -1. 
+                mini_batch_size: the size of each mini batch size.  
+            Returns:
+                [(X', y')_1, ... (X', y')_N]: List of tuples for (X, y), each representing a minibatch
+        '''
+        n, _ = X.shape
+        NUM_MINI_BATCHES = math.ceil(n / mini_batch_size)
+
+        mini_batch_list = []
+
+        for i in range(NUM_MINI_BATCHES):
+            mini_batch_start_index = i * mini_batch_size
+            mini_batch_end_index = (i + 1) * mini_batch_size
+
+            mini_batch = (X[mini_batch_start_index : mini_batch_end_index],
+                          y[mini_batch_start_index : mini_batch_end_index])
+
+            mini_batch_list.append(mini_batch)
+            
+        assert len(mini_batch_list) == NUM_MINI_BATCHES
+        # assert that the sum of all minibatch lengths equals original set size
+        assert sum(len(mini_batch[0]) for mini_batch in mini_batch_list) == n
+        return mini_batch_list
+
     def predict(self, X):
         ''' parameters:
                 X: n x d matrix; n samples; each has d features, excluding the bias feature. 
@@ -70,7 +123,7 @@ class LogisticRegression:
         Z = MyUtils.z_transform(X, degree=self.degree)  # Z-transform to match self.w dimension
         Z_bias = self._add_bias_column(Z)
 
-        return self._v_sigmoid(Z_bias @ self.w)  # it is assumed that self.w is already trained
+        return _v_sigmoid(Z_bias @ self.w)  # it is assumed that self.w is already trained
     
     def error(self, X, y):
         ''' parameters:
@@ -82,29 +135,12 @@ class LogisticRegression:
         '''
         y_hat = self.predict(X)
         
-        # do comparison error
         misclassified = 0
-        
         for (y_pred, y_label) in zip(y_hat, y):
-            
+            if (y_pred > 0.5 and int(y_label) == -1) or (y_pred <= 0.5 and int(y_label) == 1):
+                misclassified += 1
 
         return misclassified
-    
-    def _v_sigmoid(s):
-        '''
-            vectorized sigmoid function
-            
-            s: n x 1 matrix. Each element is real number represents a signal. 
-            return: n x 1 matrix. Each element is the sigmoid function value of the corresponding signal. 
-        '''
-        v_sigmoid = np.vectorize(self._sigmoid)
-        return v_sigmoid(s)
-    
-    def _sigmoid(s):
-        ''' s: a real number
-            return: the sigmoid function value of the input signal s
-        '''
-        return 1 / (1 + np.exp(-s))
     
     def _error_z(self, Z, y):
         """ An internal helper method to calculate MSE for already
@@ -133,13 +169,3 @@ class LogisticRegression:
                 X: n x (d+1) matrix, with added bias column
         """
         return np.insert(X, 0, 1, axis=1)
-    
-    def _calculate_mse(self, y_hat, y): 
-        """ parameters:
-                y_hat: n x 1 vector, predicted labels for samples
-                y: n x 1 vector, true labels for samples
-            return:
-                MSE between the predicted labels and true labels
-        """
-        n, _ = y.shape
-        return (-1 / n) * np.log()
