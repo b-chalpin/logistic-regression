@@ -9,22 +9,6 @@ sys.path.append("..")
 
 from code_misc.utils import MyUtils
 
-def _v_sigmoid(s):
-        '''
-            vectorized sigmoid function
-            
-            s: n x 1 matrix. Each element is real number represents a signal. 
-            return: n x 1 matrix. Each element is the sigmoid function value of the corresponding signal. 
-        '''
-        v_sigmoid = np.vectorize(_sigmoid)
-        return v_sigmoid(s)
-    
-def _sigmoid(s):
-    ''' s: a real number
-        return: the sigmoid function value of the input signal s
-    '''
-    return 1 / (1 + np.exp(-s))
-
 class LogisticRegression:
     def __init__(self):
         self.w = None
@@ -65,54 +49,49 @@ class LogisticRegression:
                 mini_batch_size: the size of each mini batch size.  
         '''
         X_bias = self._add_bias_column(X)
-        _, d = X_bias.shape
+        n, d = X_bias.shape
         self._init_w_vector(d)
         
-        mini_batch_list = self._generate_mini_batches(X_bias, y, mini_batch_size)
-        NUM_MINI_BATCHES = len(mini_batch_list)
+        mini_batch_index_list = self._generate_mini_batches(n, mini_batch_size)
+        NUM_MINI_BATCHES = len(mini_batch_index_list)
 
         mini_batch_index = 0 # index to keep track of minibatch we are on
         while iterations > 0:
-            X_mini, y_mini = mini_batch_list[mini_batch_index]
+            mini_batch_start, mini_batch_end = mini_batch_index_list[mini_batch_index]
+            
+            X_mini = X_bias[mini_batch_start : mini_batch_end]
+            y_mini = y[mini_batch_start : mini_batch_end]
+
             n_mini, _ = X_mini.shape
 
-            # print(f"Batch number index: {mini_batch_index}")
-            # print(f"\tMini batch {mini_batch_index}: X: {mini_batch_list[mini_batch_index][0].shape}, y: {mini_batch_list[mini_batch_index][0].shape}")
-
             s = y_mini * (X_mini @ self.w)
-            self.w = (eta / n_mini) * ((y_mini * _v_sigmoid(-s)).T @ X_mini).T + (1 - (2 * lam * eta / n_mini)) * self.w
+            self.w = (eta / n_mini) * ((y_mini * self._v_sigmoid(-s)).T @ X_mini).T + (1 - (2 * lam * eta / n_mini)) * self.w
 
             iterations -= 1
             mini_batch_index = (mini_batch_index + 1) % NUM_MINI_BATCHES # wrap around to index 0 when at the end
     
-    def _generate_mini_batches(self, X, y, mini_batch_size):
+    def _generate_mini_batches(self, n, mini_batch_size):
         ''' Performs mini batching. 
          
             Parameters: 
-                X: n x d matrix of samples; every sample has d features, excluding the bias feature. 
-                y: n x 1 vector of lables. Every label is +1 or -1. 
+                n: number of samples
                 mini_batch_size: the size of each mini batch size.  
             Returns:
-                [(X', y')_1, ... (X', y')_N]: List of tuples for (X, y), each representing a minibatch
+                [(start, end), ... (start, end)_N]: List of tuples for (start, end), each representing a minibatch start/end index
         '''
-        n, _ = X.shape
         NUM_MINI_BATCHES = math.ceil(n / mini_batch_size)
 
-        mini_batch_list = []
+        mini_batch_index_list = []
 
         for i in range(NUM_MINI_BATCHES):
             mini_batch_start_index = i * mini_batch_size
             mini_batch_end_index = (i + 1) * mini_batch_size
 
-            mini_batch = (X[mini_batch_start_index : mini_batch_end_index],
-                          y[mini_batch_start_index : mini_batch_end_index])
-
-            mini_batch_list.append(mini_batch)
+            mini_batch_index_list.append((mini_batch_start_index, mini_batch_end_index))
             
-        assert len(mini_batch_list) == NUM_MINI_BATCHES
-        # assert that the sum of all minibatch lengths equals original set size
-        assert sum(len(mini_batch[0]) for mini_batch in mini_batch_list) == n
-        return mini_batch_list
+        assert len(mini_batch_index_list) == NUM_MINI_BATCHES
+        # print(f"mini batch index list: {mini_batch_index_list}") # debug
+        return mini_batch_index_list
 
     def predict(self, X):
         ''' parameters:
@@ -123,7 +102,7 @@ class LogisticRegression:
         Z = MyUtils.z_transform(X, degree=self.degree)  # Z-transform to match self.w dimension
         Z_bias = self._add_bias_column(Z)
 
-        return _v_sigmoid(Z_bias @ self.w)  # it is assumed that self.w is already trained
+        return self._v_sigmoid(Z_bias @ self.w)  # it is assumed that self.w is already trained
     
     def error(self, X, y):
         ''' parameters:
@@ -135,12 +114,25 @@ class LogisticRegression:
         '''
         y_hat = self.predict(X)
         
-        misclassified = 0
-        for (y_pred, y_label) in zip(y_hat, y):
-            if (y_pred > 0.5 and int(y_label) == -1) or (y_pred <= 0.5 and int(y_label) == 1):
-                misclassified += 1
+        return self._calculate_misclassifications(y_hat, y)
 
-        return misclassified
+    @staticmethod
+    def _v_sigmoid(s):
+        '''
+            vectorized sigmoid function
+            
+            s: n x 1 matrix. Each element is real number represents a signal. 
+            return: n x 1 matrix. Each element is the sigmoid function value of the corresponding signal. 
+        '''
+        v_sigmoid = np.vectorize(LogisticRegression._sigmoid)
+        return v_sigmoid(s)
+    
+    @staticmethod
+    def _sigmoid(s):
+        ''' s: a real number
+            return: the sigmoid function value of the input signal s
+        '''
+        return 1 / (1 + np.exp(-s))
     
     def _error_z(self, Z, y):
         """ An internal helper method to calculate MSE for already
@@ -153,7 +145,23 @@ class LogisticRegression:
         """
         y_hat = Z @ self.w
 
-        return self._calculate_mse(y_hat, y)
+        return self._calculate_misclassifications(y_hat, y)
+
+    def _calculate_misclassifications(self, y_hat, y_labels):
+        """ An internal helper method to calculate number of
+            misclassified samples.
+            parameters:
+                y_hat: n x 1 matrix of predicted labels for samples
+                y_labels: n x 1 matrix of labels
+            return:
+                the MSE for this test set (Z,y) using the trained model
+        """
+        misclassified = 0
+        for (y_pred, y) in zip(y_hat, y_labels):
+            if (y_pred > 0.5 and int(y) == -1) or (y_pred <= 0.5 and int(y) == 1):
+                misclassified += 1
+
+        return misclassified
 
     def _init_w_vector(self, d):
         """ If self.w does not exist, it is initialized
@@ -169,3 +177,65 @@ class LogisticRegression:
                 X: n x (d+1) matrix, with added bias column
         """
         return np.insert(X, 0, 1, axis=1)
+
+    # helper method used for subproject-5 only. NOTE: pip package alive-progress MUST be installed
+    def fit_metrics(self, X, y, X_test, y_test, lam=0, eta=0.01, iterations=1000, degree=1, iteration_step=100, mini_batch_size=1000):
+        """ A method used for model performance analysis purposes. Internal use only.
+            parameters:
+                X: n x d matrix of samples, n samples, each has d features, excluding the bias feature
+                y: n x 1 matrix of lables
+                X_test: n x d matrix of validation samples
+                lam: the ridge regression parameter for regularization
+                eta: the learning rate used in gradient descent
+                iterations: the maximum iterations used in gradient descent
+                degree: the degree of the Z-space
+                iteration_step: representing the interval in iterations in which we record error
+                mini_batch_size: the size of each mini batch size. 
+            returns:
+                train_mse: epochs x 1 array of training MSE values
+                test_mse: epochs x 1 array of validation MSE values
+        """
+        # import for progress bar
+        from alive_progress import alive_bar
+        
+        # progress bar will use this as its upper bound
+        total_iterations = iterations
+        
+        self.degree = degree
+        X = MyUtils.z_transform(X, degree=self.degree)
+        
+        # training metrics to return
+        train_mse = []
+        test_mse = []
+        
+        X_bias = self._add_bias_column(X)
+        n, d = X_bias.shape
+        self._init_w_vector(d)
+        
+        mini_batch_index_list = self._generate_mini_batches(n, mini_batch_size)
+        NUM_MINI_BATCHES = len(mini_batch_index_list)
+
+        mini_batch_index = 0 # index to keep track of minibatch we are on
+
+        with alive_bar(total_iterations, title=f'\t\t\t\t\t') as bar:
+            while iterations > 0:
+                mini_batch_start, mini_batch_end = mini_batch_index_list[mini_batch_index]
+                
+                X_mini = X_bias[mini_batch_start : mini_batch_end]
+                y_mini = y[mini_batch_start : mini_batch_end]
+
+                n_mini, _ = X_mini.shape
+
+                s = y_mini * (X_mini @ self.w)
+                self.w = (eta / n_mini) * ((y_mini * self._v_sigmoid(-s)).T @ X_mini).T + (1 - (2 * lam * eta / n_mini)) * self.w
+
+                if iterations % iteration_step == 0:
+                    train_mse.append(self._error_z(X_mini, y_mini))
+                    test_mse.append(self.error(X_test, y_test))
+
+                iterations -= 1
+                mini_batch_index = (mini_batch_index + 1) % NUM_MINI_BATCHES # wrap around to index 0 when at the end
+
+                bar()
+            
+        return (train_mse, test_mse)
