@@ -18,7 +18,7 @@ def notify_user(notify_when_done=False):
 
 def main():
     # training config
-    max_degree = 2
+    max_degree = 3
     training_iterations = 10_000
     iteration_step = 500
     eta_list = [0.1, 0.01, 0.001]
