@@ -179,63 +179,63 @@ class LogisticRegression:
         return np.insert(X, 0, 1, axis=1)
 
     # helper method used for subproject-5 only. NOTE: pip package alive-progress MUST be installed
-    def fit_metrics(self, X, y, X_test, y_test, lam=0, eta=0.01, iterations=1000, degree=1, iteration_step=100, mini_batch_size=1000):
-        """ A method used for model performance analysis purposes. Internal use only.
-            parameters:
-                X: n x d matrix of samples, n samples, each has d features, excluding the bias feature
-                y: n x 1 matrix of lables
-                X_test: n x d matrix of validation samples
-                lam: the ridge regression parameter for regularization
-                eta: the learning rate used in gradient descent
-                iterations: the maximum iterations used in gradient descent
-                degree: the degree of the Z-space
-                iteration_step: representing the interval in iterations in which we record error
-                mini_batch_size: the size of each mini batch size. 
-            returns:
-                train_mse: epochs x 1 array of training MSE values
-                test_mse: epochs x 1 array of validation MSE values
-        """
-        # import for progress bar
-        from alive_progress import alive_bar
+#     def fit_metrics(self, X, y, X_test, y_test, lam=0, eta=0.01, iterations=1000, degree=1, iteration_step=100, mini_batch_size=1000):
+#         """ A method used for model performance analysis purposes. Internal use only.
+#             parameters:
+#                 X: n x d matrix of samples, n samples, each has d features, excluding the bias feature
+#                 y: n x 1 matrix of lables
+#                 X_test: n x d matrix of validation samples
+#                 lam: the ridge regression parameter for regularization
+#                 eta: the learning rate used in gradient descent
+#                 iterations: the maximum iterations used in gradient descent
+#                 degree: the degree of the Z-space
+#                 iteration_step: representing the interval in iterations in which we record error
+#                 mini_batch_size: the size of each mini batch size. 
+#             returns:
+#                 train_mse: epochs x 1 array of training MSE values
+#                 test_mse: epochs x 1 array of validation MSE values
+#         """
+#         # import for progress bar
+#         from alive_progress import alive_bar
         
-        # progress bar will use this as its upper bound
-        total_iterations = iterations
+#         # progress bar will use this as its upper bound
+#         total_iterations = iterations
         
-        self.degree = degree
-        X = MyUtils.z_transform(X, degree=self.degree)
+#         self.degree = degree
+#         X = MyUtils.z_transform(X, degree=self.degree)
         
-        # training metrics to return
-        train_mse = []
-        test_mse = []
+#         # training metrics to return
+#         train_mse = []
+#         test_mse = []
         
-        X_bias = self._add_bias_column(X)
-        n, d = X_bias.shape
-        self._init_w_vector(d)
+#         X_bias = self._add_bias_column(X)
+#         n, d = X_bias.shape
+#         self._init_w_vector(d)
         
-        mini_batch_index_list = self._generate_mini_batches(n, mini_batch_size)
-        NUM_MINI_BATCHES = len(mini_batch_index_list)
+#         mini_batch_index_list = self._generate_mini_batches(n, mini_batch_size)
+#         NUM_MINI_BATCHES = len(mini_batch_index_list)
 
-        mini_batch_index = 0 # index to keep track of minibatch we are on
+#         mini_batch_index = 0 # index to keep track of minibatch we are on
 
-        with alive_bar(total_iterations, title=f'\t\t\t\t\t') as bar:
-            while iterations > 0:
-                mini_batch_start, mini_batch_end = mini_batch_index_list[mini_batch_index]
+#         with alive_bar(total_iterations, title=f'\t\t\t\t\t') as bar:
+#             while iterations > 0:
+#                 mini_batch_start, mini_batch_end = mini_batch_index_list[mini_batch_index]
                 
-                X_mini = X_bias[mini_batch_start : mini_batch_end]
-                y_mini = y[mini_batch_start : mini_batch_end]
+#                 X_mini = X_bias[mini_batch_start : mini_batch_end]
+#                 y_mini = y[mini_batch_start : mini_batch_end]
 
-                n_mini, _ = X_mini.shape
+#                 n_mini, _ = X_mini.shape
 
-                s = y_mini * (X_mini @ self.w)
-                self.w = (eta / n_mini) * ((y_mini * self._v_sigmoid(-s)).T @ X_mini).T + (1 - (2 * lam * eta / n_mini)) * self.w
+#                 s = y_mini * (X_mini @ self.w)
+#                 self.w = (eta / n_mini) * ((y_mini * self._v_sigmoid(-s)).T @ X_mini).T + (1 - (2 * lam * eta / n_mini)) * self.w
 
-                if iterations % iteration_step == 0:
-                    train_mse.append(self._error_z(X_mini, y_mini))
-                    test_mse.append(self.error(X_test, y_test))
+#                 if iterations % iteration_step == 0:
+#                     train_mse.append(self._error_z(X_mini, y_mini))
+#                     test_mse.append(self.error(X_test, y_test))
 
-                iterations -= 1
-                mini_batch_index = (mini_batch_index + 1) % NUM_MINI_BATCHES # wrap around to index 0 when at the end
+#                 iterations -= 1
+#                 mini_batch_index = (mini_batch_index + 1) % NUM_MINI_BATCHES # wrap around to index 0 when at the end
 
-                bar()
+#                 bar()
             
-        return (train_mse, test_mse)
+#         return (train_mse, test_mse)
