@@ -1,0 +1,8 @@
+name: cscd496-prog5-bchalpin
+channels:
+  - defaults
+dependencies:
+  - python=3.8
+  - pip
+  - pip:
+      - -r requirements.txt
