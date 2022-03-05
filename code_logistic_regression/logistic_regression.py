@@ -1,5 +1,3 @@
-########## Blake Chalpin 00864973
-
 # Implementation of the logistic regression with L2 regularization and supports stachastic gradient descent
 
 import numpy as np

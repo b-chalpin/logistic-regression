@@ -2,7 +2,7 @@
 
 ## Description
 
-Using `numpy` and native Python, implement a Logistic Regression classification model. The model is able to be trained using a Closed-form method, or Gradient Descent method.
+Using `numpy` and native Python, implement a Logistic Regression classification model. The model is able to be trained using Batch Gradient Descent (BGD) or Stochastic Gradient Descent (SGD).
 
 ## Environment Installation
 
